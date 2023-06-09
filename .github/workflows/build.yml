@@ -1,0 +1,89 @@
+name: Build compiler app
+
+permissions: write-all
+
+on:
+  workflow_dispatch:
+
+
+env:
+  SOLUTION_NAME: "BMW.VDPM.Conwoy.ServiceProgram.Compiler"
+  DOTNET_CORE_VERSION: 6.0.x
+  NUGET_SOURCE: https://nuget.atc-github.azure.cloud.bmw/service-and-repairs/index.json
+
+jobs:
+  versions:
+    name: Versioning
+    uses: Service-and-Repairs/cars-conwoy-github-actions-templates/.github/workflows/calculate-version.yml@main
+    with:
+      GITVERSION_CONFIG_FILE_PATH: ./.github/git-version-config.yml
+  variables:
+    name: Prepare variables
+    needs:
+      - versions
+    runs-on: [self-hosted, conwoy-org-runner]
+    outputs:
+      IMAGE_NAME: ${{ steps.image-name.outputs.IMAGE_NAME}}
+      SOLUTION_NAME: ${{ env.SOLUTION_NAME }}
+      GITHUB_REF_NAME: ${{ github.ref_name }}
+      VERSION: ${{ steps.version-format.outputs.VERSION}}
+      DEPLOYMENT_NAME: ${{ steps.deployment-name.outputs.DEPLOYMENT_NAME}}
+    steps:
+      - id: image-name-transform
+        uses:  ASzc/change-string-case-action@v2
+        with:
+          string: ${{ env.SOLUTION_NAME }}
+      - id: image-name
+        run: echo "::set-output name=IMAGE_NAME::${{ steps.image-name-transform.outputs.lowercase }}"
+      - id: version-format
+        run: |
+          versionFormat=${{ needs.versions.outputs.majorMinorPatch }}
+          if [[ ${{ github.ref_name }} != main ]]; then
+              versionFormat=$versionFormat-${{ needs.versions.outputs.PreReleaseLabel }}
+          fi
+          echo "::set-output name=VERSION::$versionFormat"
+      - id: deployment-name
+        run: |
+          name=${{ steps.image-name.outputs.IMAGE_NAME }}
+          deploymentName=${name//[.]/-}
+          echo "::set-output name=DEPLOYMENT_NAME::$deploymentName"
+      - name: Print all
+        run: |
+          echo steps.image-name.outputs.IMAGE_NAME = ${{ steps.image-name.outputs.IMAGE_NAME }}
+          echo env.SOLUTION_NAME = ${{ env.SOLUTION_NAME }}
+          echo env.GITHUB_REF_NAME = ${{ github.ref_name }}
+          echo steps.version-format.outputs.VERSION = ${{ steps.version-format.outputs.VERSION }}
+          echo steps.deployment-name.outputs.DEPLOYMENT_NAME = ${{ steps.deployment-name.outputs.DEPLOYMENT_NAME }}
+  sonarQube:
+    name: Code quality
+    uses: Service-and-Repairs/cars-conwoy-github-actions-templates/.github/workflows/sonarqube-build.yml@main   
+    secrets:      
+      READ_PACKAGES_PAT: ${{ secrets.READ_PACKAGES_PAT }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}          
+  build:
+    needs:
+      - variables
+    runs-on: [self-hosted, atc-windows-latest]
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: ${{ env.DOTNET_CORE_VERSION }}
+    - name: Nuget
+      run: dotnet nuget add source --username %GITHUB_ACTOR% --password ${{ secrets.READ_PACKAGES_PAT }} --store-password-in-clear-text --name github %NUGET_SOURCE%
+
+    - name: Restore
+      run: dotnet restore "apps\${{ env.SOLUTION_NAME }}.App\${{ env.SOLUTION_NAME }}.App.csproj"
+
+    - name: Build
+      run: dotnet build "apps\${{ env.SOLUTION_NAME }}.App\${{ env.SOLUTION_NAME }}.App.csproj" --configuration Release --no-restore
+
+    - name: Test
+      run: dotnet test "apps\${{ env.SOLUTION_NAME }}.App\${{ env.SOLUTION_NAME }}.App.csproj" --no-build --verbosity normal
+
+    - name: Publish
+      run: dotnet publish "apps\${{ env.SOLUTION_NAME }}.App\${{ env.SOLUTION_NAME }}.App.csproj" --configuration Release --no-build --output "apps\${{ env.SOLUTION_NAME }}\publish"
+
+

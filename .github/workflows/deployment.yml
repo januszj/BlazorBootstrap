@@ -1,0 +1,37 @@
+name: Build and deploy compiler app
+
+permissions: write-all
+
+on:
+  workflow_dispatch:
+    inputs:
+      ENVIRONMENT:
+        required: true
+        description: "Environment to configure"
+        type: environment
+
+  push:
+    branches: [main, develop, 'feature/*', 'release/*', 'hotfix/*']
+
+env:
+  ENVIRONMENT: dev
+  AZURE_WEBAPP_NAME: compiler
+  SOLUTION_NAME: "BlazorBootstrap"
+  DOTNET_CORE_VERSION: 6.0.x
+
+jobs:   
+  deploy:
+    name: Deploy version  
+    runs-on: ['self-hosted', 'Windows', 'X64']
+    steps:
+      - name: Set environment variable
+        run:  |
+          echo ${{ inputs.ENVIRONMENT }}
+          if [[ ${{ inputs.ENVIRONMENT }} != '' ]]; then
+            echo "ENV=${{ inputs.ENVIRONMENT }}" >> "$GITHUB_ENV"
+          else
+            echo "ENV=dev" >> "$GITHUB_ENV"
+          fi      
+      - name: show
+        run:  echo ${{ env.ENV }}
+
