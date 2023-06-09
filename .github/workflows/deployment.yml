@@ -25,14 +25,14 @@ jobs:
     runs-on: ['self-hosted', 'Windows', 'X64']
     steps:
       - name: Set environment variable
-        run:  |
-          echo ${{ inputs.ENVIRONMENT }}
-          if [[ ${{ inputs.ENVIRONMENT }} != '' ]]; then
-            echo "ENV=${{ inputs.ENVIRONMENT }}" >> "$GITHUB_ENV"
-          else
-            echo "ENV=dev" >> "$GITHUB_ENV"
-          fi
-        shell: bash     
+        run: |
+          Write-Host $env:INPUT_ENVIRONMENT
+          if ($env:INPUT_ENVIRONMENT -ne '') {
+            $env:ENV = $env:INPUT_ENVIRONMENT
+          } else {
+            $env:ENV = 'dev'
+          }
+        shell: powershell   
       - name: show
         run:  echo ${{ env.ENV }}
 
