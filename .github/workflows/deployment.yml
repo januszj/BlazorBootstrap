@@ -34,5 +34,5 @@ jobs:
           }
         shell: powershell   
       - name: show
-        run:  echo ${{ env.ENV }}
+        run:  echo $env:ENV
 
