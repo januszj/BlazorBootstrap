@@ -31,7 +31,8 @@ jobs:
             echo "ENV=${{ inputs.ENVIRONMENT }}" >> "$GITHUB_ENV"
           else
             echo "ENV=dev" >> "$GITHUB_ENV"
-          fi      
+          fi
+        shell: bash     
       - name: show
         run:  echo ${{ env.ENV }}
 
